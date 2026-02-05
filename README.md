@@ -141,7 +141,7 @@ Add the following secrets to your GitHub repository (**Settings > Secrets and va
 
 | Secret | Description |
 |--------|-------------|
-| `FLY_API_TOKEN` | Fly.io API token (get via `fly tokens create deploy -x 999999h`) |
+| `FLY_API_TOKEN` | Fly.io **org-level** token (get via `fly tokens create org`) |
 | `RAILS_MASTER_KEY` | Value from `config/master.key` |
 
 #### PR Preview Environments
@@ -155,6 +155,26 @@ Unlike Railway, Fly.io does not have built-in PR preview environments. Instead, 
 - Destroy the app when the PR is merged or closed
 
 The preview URL is posted as a comment on the pull request by the action.
+
+#### Troubleshooting
+
+**"app not found" or random app name on first deploy**
+
+Fly.io's built-in GitHub integration requires `fly.toml` to be present on the `main` branch. Without it, Fly.io's scanner auto-detects the app type and generates a random app name (e.g., `app-black-rain-41`) that doesn't match any existing app. Ensure `fly.toml` with the correct `app` name is merged to `main` before connecting the repository in the Fly.io dashboard.
+
+**"No access token available. Please login with 'flyctl auth login'"**
+
+The `FLY_API_TOKEN` GitHub Secret is missing or empty. Add it in **Settings > Secrets and variables > Actions** in your GitHub repository.
+
+**"Not authorized to deploy this app"**
+
+The PR preview workflow creates new Fly apps for each pull request (e.g., `pr-7-codenote-net-rails-preview-demo`). A deploy token created with `fly tokens create deploy` is scoped to a single app and cannot create new apps. Use an **org-level token** instead:
+
+```bash
+fly tokens create org
+```
+
+Update the `FLY_API_TOKEN` GitHub Secret with this org-level token.
 
 ## License
 
