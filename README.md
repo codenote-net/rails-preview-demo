@@ -133,8 +133,9 @@ The Dockerfile's entrypoint also runs `db:prepare` before starting the server. T
 
 #### GitHub Actions Setup
 
-Production deploys are handled by Fly.io's built-in GitHub integration (connect your repository in the Fly.io dashboard). PR preview environments require a GitHub Actions workflow:
+Two workflows are included:
 
+- **[`fly-deploy.yml`](.github/workflows/fly-deploy.yml)** — Deploys to production on push to `main`
 - **[`fly-preview.yml`](.github/workflows/fly-preview.yml)** — Creates/updates/destroys preview apps for pull requests
 
 Add the following secrets to your GitHub repository (**Settings > Secrets and variables > Actions**):
