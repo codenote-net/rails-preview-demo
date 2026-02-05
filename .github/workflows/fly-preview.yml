@@ -1,0 +1,84 @@
+name: Fly Preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pr-${{ github.event.number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/fly-pr-review-apps@1.5.0
+        with:
+          region: nrt
+          org: personal
+          postgres: rails-preview-demo-db
+          secrets: RAILS_MASTER_KEY=${{ secrets.RAILS_MASTER_KEY }}
+      - name: Set preview URL
+        if: github.event.action != 'closed'
+        id: preview-url
+        run: |
+          APP_NAME="pr-${{ github.event.number }}-$(echo '${{ github.repository }}' | tr '/' '-')"
+          echo "url=https://${APP_NAME}.fly.dev" >> "$GITHUB_OUTPUT"
+      - name: Comment preview URL on PR
+        if: github.event.action != 'closed'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MARKER="<!-- fly-preview-url -->"
+          BODY="${MARKER}
+          **Fly.io Preview:** ${{ steps.preview-url.outputs.url }}"
+          EXISTING=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.number }}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))] | first | .id" 2>/dev/null)
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/${EXISTING}" \
+              -X PATCH -f body="${BODY}"
+          else
+            gh pr comment "${{ github.event.number }}" --repo "${{ github.repository }}" --body "${BODY}"
+          fi
+      - name: Create GitHub deployment
+        if: github.event.action != 'closed'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.payload.pull_request.head.sha,
+              environment: `preview-pr-${context.payload.number}`,
+              auto_merge: false,
+              required_contexts: [],
+              transient_environment: true,
+            });
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'success',
+              environment_url: '${{ steps.preview-url.outputs.url }}',
+              log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+      - name: Deactivate GitHub deployment
+        if: github.event.action == 'closed'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployments = await github.rest.repos.listDeployments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              environment: `preview-pr-${context.payload.number}`,
+            });
+            for (const deployment of deployments.data) {
+              await github.rest.repos.createDeploymentStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                deployment_id: deployment.id,
+                state: 'inactive',
+              });
+            }
