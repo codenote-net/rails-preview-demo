@@ -18,7 +18,7 @@ gem "importmap-rails", "2.2.3"
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 
 # Reduces boot times through caching; required in config/boot.rb
-gem "bootsnap", "1.22.0", require: false
+gem "bootsnap", "1.23.0", require: false
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
